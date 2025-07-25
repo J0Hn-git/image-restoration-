@@ -101,10 +101,91 @@ def apply_gamma_correction(image_np, gamma=1.2):
     return np.clip(gamma_corrected_image, 0.0, 1.0)
 
 # applying scratches to the image.
+def add_scratches(image_np, num_scratches=3, line_width=1, intensity=0.1):
+    """
+    Adds simplified line scratches to the image.
+    Note: Highly realistic scratches are very complex to generate procedurally.
+    This is a basic simulation.
+    """
+    scratch_image = np.copy(image_np)
+    h, w, _ = scratch_image.shape # Get image dimensions
 
+    for _ in range(num_scratches):
+        # Random start and end points for the line
+        x1, y1 = random.randint(0, w), random.randint(0, h)
+        x2, y2 = random.randint(0, w), random.randint(0, h)
+
+        # Random color for the scratch (black or white)
+        scratch_color = random.choice([0.0, 1.0])
+        color_tuple = (scratch_color, scratch_color, scratch_color) # RGB tuple for line color
+
+        # Draw line on a temporary black image (mask)
+        temp_mask = np.zeros_like(image_np) # Create a black image of the same size
+        cv2.line(temp_mask, (x1, y1), (x2, y2), color_tuple, thickness=line_width) # Draw line on the mask
+
+        # Blend the scratch mask with the image
+        # This blending applies the scratch based on its color and intensity
+        scratch_image = scratch_image * (1 - temp_mask * intensity) + temp_mask * scratch_color * intensity
+        scratch_image = np.clip(scratch_image, 0.0, 1.0)
+    return scratch_image
+
+# add dust spots.
+def add_dust_spots(image_np, num_spots=10, max_spot_size=2, intensity=0.1):
+    """
+    Adds simplified circular dust spots to the image.
+    Note: Highly realistic dust is very complex to generate procedurally.
+    This is a basic simulation.
+    """
+    dust_image = np.copy(image_np)
+    h, w, _ = dust_image.shape
+
+    for _ in range(num_spots):
+        center_x, center_y = random.randint(0, w), random.randint(0, h) # Random center for the spot
+        radius = random.randint(1, max_spot_size) # Random radius for the spot
+        
+        spot_color = random.choice([0.0, 1.0]) # Random color (black or white)
+        color_tuple = (spot_color, spot_color, spot_color)
+
+        temp_mask = np.zeros_like(image_np)
+        cv2.circle(temp_mask, (center_x, center_y), radius, color_tuple, -1) # Draw a filled circle on the mask
+
+        # Blend the spot mask with the image (same blending logic as scratches)
+        dust_image = dust_image * (1 - temp_mask * intensity) + temp_mask * spot_color * intensity
+        dust_image = np.clip(dust_image, 0.0, 1.0)
+    return dust_image
          
-                        
+# combine the random degradations.
+def combine_random_degradations(image_np):
+    """
+    Applies a random combination of degradations to the image.
+    You can customize which degradations are applied and their parameters.
+    """
+    degraded_image = np.copy(image_np)
+    h, w, _ = degraded_image.shape
+
+    # Define a list of degradation functions and their parameter ranges
+    degradation_options = [
+        (add_gaussian_noise, {'std_dev': random.uniform(0.01, 0.1)}),
+        (add_salt_pepper_noise, {'amount': random.uniform(0.001, 0.01)}),
+        (apply_gaussian_blur, {'kernel_size': random.choice([3, 5, 7])}),
+        (apply_motion_blur, {'kernel_size': random.choice([5, 7, 9]), 'angle': random.choice([0, 45, 90, 135, 180])}),
+        (add_color_fading, {'factor': random.uniform(0.5, 0.9)}),
+        (apply_color_cast, {'r_bias': random.uniform(-0.1, 0.1), 'g_bias': random.uniform(-0.1, 0.1), 'b_bias': random.uniform(-0.1, 0.1)}),
+        (apply_gamma_correction, {'gamma': random.uniform(0.8, 1.5)}),
+        (add_scratches, {'num_scratches': random.randint(1, 5), 'line_width': random.randint(1, 2), 'intensity': random.uniform(0.05, 0.2)}),
+        (add_dust_spots, {'num_spots': random.randint(5, 20), 'max_spot_size': random.randint(1, 3), 'intensity': random.uniform(0.05, 0.2)})
+    ]
+
+    # Randomly select a subset of degradations to apply (e.g., 3 to 7 degradations)
+    num_degradations_to_apply = random.randint(3, len(degradation_options))
+    selected_degradations = random.sample(degradation_options, num_degradations_to_apply)
+
+    # Apply selected degradations in a random order
+    random.shuffle(selected_degradations)
+    for func, params in selected_degradations:
+        degraded_image = func(degraded_image, **params) # Call the function with its random parameters
     
+    return degraded_image      
         
     
 
